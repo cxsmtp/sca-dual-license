@@ -1,0 +1,13 @@
+{
+  "Packages": [
+    { "Id": "Npm-jszip-3.10.1", "Name": "jszip", "Version": "3.10.1", "PackageRepository": "Npm", "IsDirectDependency": true, "Licenses": ["MIT", "GPL-3.0"] },
+    { "Id": "Npm-lodash-4.17.21", "Name": "lodash", "Version": "4.17.21", "PackageRepository": "Npm", "IsDirectDependency": false, "Licenses": ["MIT"] },
+    { "Id": "Maven-javax.mail-1.6.2", "Name": "javax.mail", "Version": "1.6.2", "PackageRepository": "Maven", "IsDirectDependency": true, "Licenses": ["CDDL-1.1"] }
+  ],
+  "Licenses": [
+    { "PackageId": "Npm-jszip-3.10.1", "Name": "MIT", "RiskLevel": "Low" },
+    { "PackageId": "Npm-jszip-3.10.1", "Name": "GPL-3.0", "RiskLevel": "High" },
+    { "PackageId": "Maven-javax.mail-1.6.2", "Name": "CDDL-1.1", "RiskLevel": "Medium" },
+    { "PackageId": "Maven-javax.mail-1.6.2", "Name": "GPL-2.0-with-classpath-exception", "RiskLevel": "Medium" }
+  ]
+}
