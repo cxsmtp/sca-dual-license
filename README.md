@@ -4,7 +4,23 @@
 
 Needs Node.js 18 or newer. There is nothing to install.
 
-## Setup
+## Option A: web page (paste your API key in the browser)
+
+```bash
+node cx-sca-web.mjs
+```
+
+Then open **http://localhost:3939** and paste your Checkmarx One API key. The page detects your tenant and region from the key. Click **Fetch results** to get:
+
+- live progress for each project
+- the list of packages with more than one effective license, which you can filter and sort
+- **Export CSV**
+
+Checkmarx One blocks API calls made directly from a browser, so this small local server makes the calls for the page. It only listens on `127.0.0.1`, keeps the key in memory for that run only, and never writes it to disk. To use a different port: `PORT=8080 node cx-sca-web.mjs`.
+
+## Option B: command line
+
+### Setup
 
 Create an API key in Checkmarx One (**Settings → Identity and Access Management → API Keys**), then:
 
@@ -21,7 +37,7 @@ The script reads the tenant and the IAM URL from the API key. If you need to set
 | `CX_TENANT` | your tenant name |
 | `CX_CLIENT_ID` / `CX_CLIENT_SECRET` | OAuth client, used instead of an API key |
 
-## Run
+### Run
 
 ```bash
 node cx-sca-multi-license.mjs

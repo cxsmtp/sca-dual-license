@@ -107,8 +107,7 @@ function decodeJwtPayload(token) {
   }
 }
 
-function resolveConfig() {
-  const env = process.env;
+export function resolveConfig(env = process.env) {
   const cfg = {
     apiKey: env.CX_API_KEY || null,
     clientId: env.CX_CLIENT_ID || null,
@@ -119,7 +118,7 @@ function resolveConfig() {
   };
 
   if (!cfg.apiKey && !(cfg.clientId && cfg.clientSecret)) {
-    die('Set CX_API_KEY, or CX_CLIENT_ID and CX_CLIENT_SECRET.');
+    throw new Error('Provide an API key (CX_API_KEY), or CX_CLIENT_ID and CX_CLIENT_SECRET.');
   }
 
   // An API key is a JWT whose "iss" is https://<iam-host>/auth/realms/<tenant>
@@ -135,15 +134,15 @@ function resolveConfig() {
   if (!cfg.iamUrl && cfg.baseUrl) cfg.iamUrl = cfg.baseUrl.replace('://ast.', '://iam.').replace('.ast.', '.iam.');
   if (!cfg.baseUrl && cfg.iamUrl) cfg.baseUrl = cfg.iamUrl.replace('://iam.', '://ast.').replace('.iam.', '.ast.');
 
-  if (!cfg.tenant) die('Could not determine tenant. Set CX_TENANT.');
-  if (!cfg.baseUrl || !cfg.iamUrl) die('Could not determine URLs. Set CX_BASE_URL (and CX_IAM_URL if non-standard).');
+  if (!cfg.tenant) throw new Error('Could not determine tenant from the API key. Set CX_TENANT.');
+  if (!cfg.baseUrl || !cfg.iamUrl) throw new Error('Could not determine URLs. Set CX_BASE_URL (and CX_IAM_URL if non-standard).');
 
   cfg.baseUrl = cfg.baseUrl.replace(/\/+$/, '');
   cfg.iamUrl = cfg.iamUrl.replace(/\/+$/, '');
   return cfg;
 }
 
-class CxClient {
+export class CxClient {
   constructor(cfg) {
     this.cfg = cfg;
     this.token = null;
@@ -163,7 +162,7 @@ class CxClient {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body,
     });
-    if (!res.ok) die(`Authentication failed (${res.status}): ${await res.text()}`);
+    if (!res.ok) throw new Error(`Authentication failed (${res.status}): ${(await res.text()).slice(0, 300)}`);
     const json = await res.json();
     this.token = json.access_token;
     this.tokenExpiresAt = Date.now() + (json.expires_in ?? 1800) * 1000 - 60_000;
@@ -209,7 +208,7 @@ function scaCompleted(scan) {
 }
 
 /** Walks scans newest-first and keeps the latest SCA scan of each distinct project. */
-async function getLatestScaScanPerProject(client, maxProjects, branch) {
+export async function getLatestScaScanPerProject(client, maxProjects, branch) {
   const byProject = new Map();
   const pageSize = 200;
   for (let offset = 0; byProject.size < maxProjects; offset += pageSize) {
@@ -231,7 +230,7 @@ async function getLatestScaScanPerProject(client, maxProjects, branch) {
 }
 
 /** Uses the SCA export service to get the full ScanReportJson for a scan. */
-async function fetchScaReport(client, scanId, effectiveOnly) {
+export async function fetchScaReport(client, scanId, effectiveOnly) {
   const { exportId } = await client.request('/api/sca/export/requests', {
     method: 'POST',
     body: {
@@ -333,7 +332,7 @@ export function analyseReport(report, { allLicenses = false } = {}) {
 
 // ------------------------------------------------------------------ Output --
 
-const csvCell = (v) => {
+export const csvCell = (v) => {
   const s = String(v ?? '');
   return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
@@ -358,7 +357,7 @@ function printList(rows, minLicenses) {
   for (const r of rows) console.log(fmt(cols.map(([, f]) => f(r))));
 }
 
-async function writeOutputs(rows, summary, prefix) {
+export function toCsv(rows) {
   const header = [
     'Project', 'ProjectId', 'Branch', 'ScanId', 'ScanDate',
     'Package', 'Version', 'PackageManager', 'Dependency',
@@ -373,14 +372,18 @@ async function writeOutputs(rows, summary, prefix) {
     ].map(csvCell).join(','));
   }
   // BOM so Excel opens UTF-8 correctly
-  await writeFile(`${prefix}.csv`, '﻿' + lines.join('\r\n') + '\r\n', 'utf8');
+  return '﻿' + lines.join('\r\n') + '\r\n';
+}
+
+async function writeOutputs(rows, summary, prefix) {
+  await writeFile(`${prefix}.csv`, toCsv(rows), 'utf8');
   await writeFile(`${prefix}.json`, JSON.stringify({ generatedAt: new Date().toISOString(), summary, packages: rows }, null, 2));
   log(`\nExported ${rows.length} row(s) to ${prefix}.csv and ${prefix}.json`);
 }
 
 // -------------------------------------------------------------------- Main --
 
-async function mapLimit(items, limit, fn) {
+export async function mapLimit(items, limit, fn) {
   const results = new Array(items.length);
   let i = 0;
   const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
@@ -393,7 +396,7 @@ async function mapLimit(items, limit, fn) {
   return results;
 }
 
-function toRows(scanMeta, packages, minLicenses) {
+export function toRows(scanMeta, packages, minLicenses) {
   return packages
     .filter((p) => p.licenses.size >= minLicenses)
     .map((p) => ({
@@ -428,7 +431,9 @@ async function main() {
       rows.push(...hits);
     }
   } else {
-    const client = new CxClient(resolveConfig());
+    let cfg;
+    try { cfg = resolveConfig(); } catch (e) { die(e.message); }
+    const client = new CxClient(cfg);
     log(`Tenant: ${client.cfg.tenant}  |  ${client.cfg.baseUrl}`);
     await client.authenticate();
 
@@ -461,6 +466,6 @@ async function main() {
 }
 
 // Run only when executed directly (allows importing analyseReport in tests)
-if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('cx-sca-multi-license.mjs')) {
+if (process.argv[1]?.endsWith('cx-sca-multi-license.mjs')) {
   main().catch((err) => die(err.stack || err.message));
 }
